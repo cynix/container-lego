@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+
+import docker, json, os, subprocess, sys
+from pathlib import Path
+
+
+ACME = 'acme-v02.api.letsencrypt.org'
+ROOT = '/etc/lego'
+ARGS = '/etc/lego.args'
+SIGNAL = 'SIGHUP'
+
+
+def hook(domain):
+    print(f"certificate obtained: {domain}", file=sys.stderr)
+
+    try:
+        client = docker.from_env()
+    except:
+        return 1
+
+    with open('/proc/1/cpuset') as f:
+        cpuset = f.read().strip()
+
+    if cpuset == '/':
+        me = None
+    else:
+        me = client.containers.get(os.path.splitext(os.path.basename(cpuset))[0].split('-')[-1]).id
+
+    for container in client.containers.list(filters={'label': f"org.cynix.lego-domain={domain}", 'status': 'running'}):
+        if container.id == me:
+            continue
+
+        print(f"sending {SIGNAL} to container '{container.name}' ({container.id})", file=sys.stderr)
+        container.kill(SIGNAL)
+    else:
+        print(f"did not find containers with label org.cynix.lego-domain={domain}", file=sys.stderr)
+
+    return 0
+
+
+def renew():
+    with open(ARGS) as f:
+        args = f.read().splitlines()
+        args.append('--accept-tos')
+
+    root = Path(ROOT)
+
+    if not [x for x in args if x.startswith('--email') or x.startswith('-m')]:
+        for e in sorted((root / 'accounts' / ACME).glob('*')):
+            if e.is_dir():
+                args.append(f"--email={e.name}")
+                break
+
+    for j in sorted((root / 'certificates').glob('*.json')):
+        with j.open() as f:
+            domain = json.load(f).get('domain')
+
+        if not domain:
+            continue
+
+        print(f"maybe renewing: {domain}", file=sys.stderr)
+
+        subprocess.call(
+            ['/usr/bin/lego', f"--path={ROOT}", f"--domains={domain}"] +
+            args +
+            ['--accept-tos', 'renew', '--days=21', '--renew-hook=/etc/periodic/daily/lego'])
+
+
+def main():
+    if len(sys.argv) == 1:
+        domain = os.getenv('LEGO_CERT_DOMAIN')
+
+        if domain:
+            return hook(domain)
+        else:
+            return renew()
+
+    args = sys.argv[1:]
+
+    if args[0] == 'auto':
+        del args[0]
+
+        for arg in args:
+            if arg.startswith('--domains=') or arg.startswith('--path=') or not arg.startswith('--'):
+                print(f"invalid argument for auto mode: {arg}", file=sys.stderr)
+                return 1
+
+        with open(ARGS, 'w') as f:
+            for arg in args:
+                print(arg, file=f)
+
+        renew()
+        os.execl('/usr/sbin/crond', '/usr/sbin/crond', '-f', '-d8')
+
+    os.execl('/usr/bin/lego', '/usr/bin/lego', *args)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
