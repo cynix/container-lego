@@ -18,18 +18,7 @@ def hook(domain):
     except:
         return 1
 
-    with open('/proc/1/cpuset') as f:
-        cpuset = f.read().strip()
-
-    if cpuset == '/':
-        me = None
-    else:
-        me = client.containers.get(os.path.splitext(os.path.basename(cpuset))[0].split('-')[-1]).id
-
     for container in client.containers.list(filters={'label': f"org.cynix.lego-domain={domain}", 'status': 'running'}):
-        if container.id == me:
-            continue
-
         print(f"sending {SIGNAL} to container '{container.name}' ({container.id})", file=sys.stderr)
         container.kill(SIGNAL)
     else:
