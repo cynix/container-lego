@@ -53,7 +53,7 @@ def renew():
         subprocess.call(
             ['/lego', f"--path={ROOT}", f"--domains={domain}"] +
             args +
-            ['--accept-tos', 'renew', '--days=21', '--renew-hook=/etc/periodic/daily/lego'])
+            ['renew', '--no-random-sleep', '--days=21', '--renew-hook=/etc/periodic/daily/lego'])
 
 
 def main():
