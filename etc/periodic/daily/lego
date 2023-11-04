@@ -51,7 +51,7 @@ def renew():
         print(f"Maybe renewing: {domain}", file=sys.stderr)
 
         subprocess.call(
-            ['/usr/bin/lego', f"--path={ROOT}", f"--domains={domain}"] +
+            ['/lego', f"--path={ROOT}", f"--domains={domain}"] +
             args +
             ['--accept-tos', 'renew', '--days=21', '--renew-hook=/etc/periodic/daily/lego'])
 
@@ -82,7 +82,7 @@ def main():
         renew()
         os.execl('/usr/sbin/crond', '/usr/sbin/crond', '-f', '-d8')
 
-    os.execl('/usr/bin/lego', '/usr/bin/lego', *args)
+    os.execl('/lego', '/lego', *args)
 
 
 if __name__ == '__main__':
