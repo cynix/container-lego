@@ -11,18 +11,19 @@ SIGNAL = 'SIGHUP'
 
 
 def hook(domain):
-    print(f"certificate obtained: {domain}", file=sys.stderr)
+    print(f"Certificate obtained: {domain}", file=sys.stderr)
 
     try:
         client = docker.from_env()
-    except:
+    except Exception as e:
+        print(f"Failed to create Docker client: {e}", file=sys.stderr)
         return 1
 
     for container in client.containers.list(filters={'label': f"org.cynix.lego-domain={domain}", 'status': 'running'}):
-        print(f"sending {SIGNAL} to container '{container.name}' ({container.id})", file=sys.stderr)
+        print(f"Sending {SIGNAL} to container '{container.name}' ({container.id})", file=sys.stderr)
         container.kill(SIGNAL)
     else:
-        print(f"did not find containers with label org.cynix.lego-domain={domain}", file=sys.stderr)
+        print(f"Did not find containers with label org.cynix.lego-domain={domain}", file=sys.stderr)
 
     return 0
 
@@ -47,7 +48,7 @@ def renew():
         if not domain:
             continue
 
-        print(f"maybe renewing: {domain}", file=sys.stderr)
+        print(f"Maybe renewing: {domain}", file=sys.stderr)
 
         subprocess.call(
             ['/usr/bin/lego', f"--path={ROOT}", f"--domains={domain}"] +
@@ -71,7 +72,7 @@ def main():
 
         for arg in args:
             if arg.startswith('--domains=') or arg.startswith('--path=') or not arg.startswith('--'):
-                print(f"invalid argument for auto mode: {arg}", file=sys.stderr)
+                print(f"Invalid argument for auto mode: {arg}", file=sys.stderr)
                 return 1
 
         with open(ARGS, 'w') as f:
